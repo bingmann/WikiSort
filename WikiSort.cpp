@@ -97,7 +97,7 @@ namespace Wiki {
 	// standard merge operation using an internal or external buffer
 	template <typename Iterator, typename Comparison>
 	void Merge(const RangeI<Iterator>& buffer, const RangeI<Iterator>& A, const RangeI<Iterator>& B,
-		   const Comparison compare, typename std::iterator_traits<Iterator>::value_type* cache, const size_t cache_size)
+		   const Comparison compare, typename std::iterator_traits<Iterator>::value_type* cache, const ssize_t cache_size)
 	{
 		typedef typename std::iterator_traits<Iterator>::value_type value_type;
 
@@ -176,7 +176,7 @@ namespace Wiki {
 		
 		// also, if you change this to dynamically allocate a full-size buffer,
 		// the algorithm seamlessly degenerates into a standard merge sort!
-		const size_t cache_size = 512;
+		const ssize_t cache_size = 512;
 		value_type cache[cache_size];
 		
 		// calculate how to scale the index value to the range within the array
@@ -206,8 +206,8 @@ namespace Wiki {
 
 		// then merge sort the higher levels, which can be 32-63, 64-127, 128-255, etc.
 		for (size_t merge_size = 16; merge_size < power_of_two; merge_size += merge_size) {
-			size_t block_size = sqrt(decimal_step);
-			size_t buffer_size = decimal_step / block_size + 1;
+			ssize_t block_size = sqrt(decimal_step);
+			ssize_t buffer_size = decimal_step / block_size + 1;
 			
 			// as an optimization, we really only need to pull out an internal buffer once for each level of merges
 			// after that we can reuse the same buffer over and over, then redistribute it when we're finished with this level
@@ -261,7 +261,7 @@ namespace Wiki {
 						
 					} else {
 						// the first item is always going to be the first unique value, so let's start searching at the next index
-						size_t count = 1;
+						ssize_t count = 1;
 						for (buffer1.start = A.start + 1; buffer1.start < A.end; buffer1.start++)
 							if (compare(*(buffer1.start - 1), *buffer1.start) || compare(*buffer1.start, *(buffer1.start - 1)))
 								if (++count == buffer_size)
@@ -378,7 +378,7 @@ namespace Wiki {
 						}
 						
 						// move the unique values to the start of A if needed
-						size_t length = bufferA.length(); count = 0;
+						ssize_t length = bufferA.length(); count = 0;
 						for (Iterator index = bufferA.start; count < length; index--) {
 							if (index == A.start || compare(*(index - 1), *index) || compare(*index, *(index - 1))) {
 								Rotate(index + 1, bufferA.start + 1, -count, cache, cache_size);
