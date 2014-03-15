@@ -77,7 +77,7 @@ void Rotate(Iterator begin, Iterator end, const ssize_t amount,
 	if (r1 <= r2) {
 		if (r1 <= cache_size) {
 			std::copy(begin, split, cache);
-			std::copy_backward(split, end, begin + r2);
+			std::copy(split, end, begin);
 			std::copy(cache, cache + r1, begin + r2);
 			return;
 		}
