@@ -216,20 +216,21 @@ namespace Wiki {
 		long decimal_step = size / fractional_base;
 		
 		// first insertion sort everything the lowest level, which is 16-31 items at a time
-		long start, mid, end, decimal = 0, fractional = 0;
-		while (decimal < size) {
-			start = decimal;
+		Iterator start = first, mid, end = first;
+		long fractional = 0;
+		while (end < last) {
 			
-			decimal += decimal_step;
+			end += decimal_step;
+
 			fractional += fractional_step;
 			if (fractional >= fractional_base) {
 				fractional -= fractional_base;
-				decimal++;
+				end++;
 			}
 			
-			end = decimal;
-			
-			InsertionSort(array + start, array + end, compare);
+			InsertionSort(start, end, compare);
+
+			start = end;
 		}
 
 		// then merge sort the higher levels, which can be 32-63, 64-127, 128-255, etc.
@@ -242,9 +243,9 @@ namespace Wiki {
 			Range level1 = Range(0, 0), level2;
 			RangeT levelA, levelB;
 			
-			decimal = fractional = 0;
+			long decimal = fractional = 0;
 			while (decimal < size) {
-				start = decimal;
+				start = first + decimal;
 				
 				decimal += decimal_step;
 				fractional += fractional_step;
@@ -253,7 +254,7 @@ namespace Wiki {
 					decimal++;
 				}
 				
-				mid = decimal;
+				mid = first + decimal;
 				
 				decimal += decimal_step;
 				fractional += fractional_step;
@@ -262,15 +263,15 @@ namespace Wiki {
 					decimal++;
 				}
 				
-				end = decimal;
+				end = first + decimal;
 				
-				if (compare(array[end - 1], array[start])) {
+				if (compare(*(end - 1), *start)) {
 					// the two ranges are in reverse order, so a simple rotation should fix it
-					Rotate(array + start, array + end, mid - start, cache, cache_size);
+					Rotate(start, end, mid - start, cache, cache_size);
 					
-				} else if (compare(array[mid], array[mid - 1])) {
+				} else if (compare(*mid, *(mid - 1))) {
 					// these two ranges weren't already in order, so we'll need to merge them!
-					Range A = Range(start, mid), B = Range(mid, end);
+					Range A = Range(start - first, mid - first), B = Range(mid - first, end - first);
 					
 					if (A.length() <= cache_size) {
 						std::copy(&array[A.start], &array[A.end], cache);
@@ -279,7 +280,7 @@ namespace Wiki {
 					}
 					
 					// try to fill up two buffers with unique values in ascending order
-					Range bufferA, bufferB, buffer1, buffer2, blockA, blockB, firstA, lastA, lastB;
+					Range bufferA, bufferB, buffer1, buffer2;
 					
 					if (level1.length() > 0) {
 						// reuse the buffers we found in a previous iteration
@@ -434,8 +435,8 @@ namespace Wiki {
 					}
 					
 					// break the remainder of A into blocks. firstA is the uneven-sized first A block
-					blockA = Range(bufferA.end, A.end);
-					firstA = Range(bufferA.end, bufferA.end + blockA.length() % block_size);
+					Range blockA = Range(bufferA.end, A.end);
+					Range firstA = Range(bufferA.end, bufferA.end + blockA.length() % block_size);
 					
 					// swap the second value of each A block with the value in buffer1
 					for (long index = 0, indexA = firstA.end + 1; indexA < blockA.end; index++, indexA += block_size) 
@@ -443,9 +444,9 @@ namespace Wiki {
 					
 					// start rolling the A blocks through the B blocks!
 					// whenever we leave an A block behind, we'll need to merge the previous A block with any B blocks that follow it, so track that information as well
-					lastA = firstA;
-					lastB = Range(0, 0);
-					blockB = Range(B.start, B.start + std::min(block_size, B.length() - bufferB.length()));
+					Range lastA = firstA;
+					Range lastB = Range(0, 0);
+					Range blockB = Range(B.start, B.start + std::min(block_size, B.length() - bufferB.length()));
 					blockA.start += firstA.length();
 					
 					long minA = blockA.start, indexA = 0;
