@@ -47,18 +47,6 @@ long FloorPowerOfTwo (const long value) {
 	return x - (x >> 1);
 }
 
-// find the index of the first value within the range that is equal to array[index]
-template <typename Iterator, typename Comparison>
-long BinaryFirst(Iterator begin, Iterator end, const typename std::iterator_traits<Iterator>::value_type& value, const Comparison compare) {
-	return std::lower_bound(begin, end, value, compare) - begin;
-}
-
-// find the index of the last value within the range that is equal to array[index], plus 1
-template <typename Iterator, typename Comparison>
-long BinaryLast(Iterator begin, Iterator end, const typename std::iterator_traits<Iterator>::value_type& value, const Comparison compare) {
-	return std::upper_bound(begin, end, value, compare) - begin;
-}
-
 // n^2 sorting algorithm used to sort tiny chunks of the full array
 template <typename Iterator, typename Comparison>
 void InsertionSort(Iterator begin, Iterator end, const Comparison compare) {
@@ -375,7 +363,7 @@ namespace Wiki {
 							// we can use this knowledge to write a merge operation that is optimized for arrays of repeating values
 							while (A.length() > 0 && B.length() > 0) {
 								// find the first place in B where the first item in A needs to be inserted
-								Iterator mid = BinaryFirst(B.start, B.end, *A.start, compare) + B.start;
+								Iterator mid = std::lower_bound(B.start, B.end, *A.start, compare);
 								
 								// rotate A into place
 								long amount = mid - A.end;
@@ -383,7 +371,7 @@ namespace Wiki {
 								
 								// calculate the new A and B ranges
 								B.start = mid;
-								A = Range(BinaryLast(A.start, A.end, *(A.start + amount), compare) + A.start, B.start);
+								A = Range(std::upper_bound(A.start, A.end, *(A.start + amount), compare), B.start);
 							}
 							
 							continue;
@@ -437,14 +425,14 @@ namespace Wiki {
 					if (lastA.length() <= cache_size)
 						std::copy(lastA.start, lastA.end, cache);
 					else
-						BlockSwap(lastA.start, buffer2.start, lastA.length());
+						std::swap_ranges(lastA.start, lastA.end, buffer2.start);
 					
 					while (true) {
 						// if there's a previous B block and the first value of the minimum A block is <= the last value of the previous B block,
 						// then drop that minimum A block behind. or if there are no B blocks left then keep dropping the remaining A blocks.
 						if ((lastB.length() > 0 && !compare(*(lastB.end - 1), min_value)) || blockB.length() == 0) {
 							// figure out where to split the previous B block, and rotate it at the split
-							Iterator B_split = BinaryFirst(lastB.start, lastB.end, min_value, compare) + lastB.start;
+							Iterator B_split = std::lower_bound(lastB.start, lastB.end, min_value, compare);
 							long B_remaining = lastB.end - B_split;
 							
 							// swap the minimum A block to the beginning of the rolling A blocks
