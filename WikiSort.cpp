@@ -601,16 +601,16 @@ namespace Testing {
 using namespace std;
 
 // make sure the items within the given range are in a stable order
-template <typename Comparison>
-void Verify(const Test array[], const Range range, const Comparison compare, const string msg) {
-	for (long index = range.start + 1; index < range.end; index++) {
+template <typename Iterator, typename Comparison>
+void Verify(Iterator start, Iterator end, const Comparison compare, const string msg) {
+	for (Iterator iter = start + 1; iter < end; iter++) {
 		// if it's in ascending order then we're good
 		// if both values are equal, we need to make sure the index values are ascending
-		if (!(compare(array[index - 1], array[index]) ||
-			  (!compare(array[index], array[index - 1]) && array[index].index > array[index - 1].index))) {
+		if (!(compare(*(iter - 1), *iter) ||
+		      (!compare(*iter, *(iter - 1)) && iter->index > (iter - 1)->index))) {
 			
-			for (long index2 = range.start; index2 < range.end; index2++)
-				cout << array[index2].value << " (" << array[index2].index << ") ";
+			for (Iterator iter2 = start; iter2 < end; iter2++)
+				cout << iter2->value << " (" << iter2->index << ") ";
 			
 			cout << endl << "failed with message: " << msg << endl;
 			assert(false);
@@ -658,7 +658,7 @@ int main() {
 		
 		stable_sort(array2.begin(), array2.end(), compare);
 		
-		Verify(&array1[0], Range(0, total), compare, "test case failed");
+		Verify(array1.begin(), array1.end(), compare, "test case failed");
 		for (long index = 0; index < total; index++)
 			assert(!compare(array1[index], array2[index]) && !compare(array2[index], array1[index]));
 	}
@@ -706,7 +706,7 @@ int main() {
 		// make sure the arrays are sorted correctly, and that the results were stable
 		cout << "verifying... " << flush;
 		
-		Verify(&array1[0], Range(0, total), compare, "testing the final array");
+		Verify(array1.begin(), array1.end(), compare, "testing the final array");
 		for (long index = 0; index < total; index++)
 			assert(!compare(array1[index], array2[index]) && !compare(array2[index], array1[index]));
 		
