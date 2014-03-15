@@ -565,7 +565,7 @@ namespace Testing {
 	
 	// purely random data is one of the few cases where it is slower than stable_sort(),
 	// although it does end up only running at about 87% as fast in that situation
-	long Random(long index, long total) {
+	long Random(long /* index */ , long /* total */) {
 		return rand();
 	}
 	
@@ -573,11 +573,11 @@ namespace Testing {
 		return total - index + rand() * 1.0/RAND_MAX * 5 - 2.5;
 	}
 	
-	long MostlyAscending(long index, long total) {
+	long MostlyAscending(long index, long /* total */) {
 		return index + rand() * 1.0/RAND_MAX * 5 - 2.5;
 	}
 	
-	long Ascending(long index, long total) {
+	long Ascending(long index, long /* total */) {
 		return index;
 	}
 	
@@ -585,15 +585,15 @@ namespace Testing {
 		return total - index;
 	}
 	
-	long Equal(long index, long total) {
+	long Equal(long /* index */, long /* total */) {
 		return 1000;
 	}
 	
-	long Jittered(long index, long total) {
+	long Jittered(long index, long /* total */) {
 		return (rand() * 1.0/RAND_MAX <= 0.9) ? index : (index - 2);
 	}
 	
-	long MostlyEqual(long index, long total) {
+	long MostlyEqual(long /* index */, long /* total */) {
 		return 1000 + rand() * 1.0/RAND_MAX * 4;
 	}
 }
@@ -643,7 +643,7 @@ int main() {
 	long total = max_size;
 	array1.resize(total);
 	array2.resize(total);
-	for (int test_case = 0; test_case < sizeof(test_cases)/sizeof(test_cases[0]); test_case++) {
+	for (size_t test_case = 0; test_case < sizeof(test_cases)/sizeof(test_cases[0]); test_case++) {
 		
 		for (long index = 0; index < total; index++) {
 			Test item;
