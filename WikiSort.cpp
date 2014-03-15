@@ -38,7 +38,7 @@ public:
 	
 	RangeI() {}
 	RangeI(iterator start, iterator end) : start(start), end(end) {}
-	RangeI(value_type* array, const Range& r) : start(array + r.start), end(array + r.end) {}
+	RangeI(iterator begin, const Range& r) : start(begin + r.start), end(begin + r.end) {}
 	inline long length() const { return end - start; }
 };
 
@@ -85,7 +85,9 @@ void BlockSwap(Iterator start1, Iterator start2, const long block_size) {
 
 // rotate the values in an array ([0 1 2 3] becomes [1 2 3 0] if we rotate by 1)
 template <typename Iterator>
-void Rotate(Iterator begin, Iterator end, const long amount, Iterator cache, const long cache_size) {
+void Rotate(Iterator begin, Iterator end, const long amount,
+	    typename std::iterator_traits<Iterator>::value_type* cache, const long cache_size)
+{
 	if (begin >= end) return;
 	
 	Iterator split;
@@ -185,10 +187,13 @@ namespace Wiki {
 		// (bit of a nasty hack, but it's good enough for now...)
 		const long size = last - first;
 		__typeof__(&first[0]) array = &first[0];
+
+		typedef typename std::iterator_traits<Iterator>::value_type value_type;
+		typedef RangeI<Iterator> RangeT;
 		
 		// if there are 32 or fewer items, just insertion sort the entire array
 		if (size <= 32) {
-			InsertionSort(array, array + size, compare);
+			InsertionSort(first, last, compare);
 			return;
 		}
 		
@@ -201,14 +206,14 @@ namespace Wiki {
 		// also, if you change this to dynamically allocate a full-size buffer,
 		// the algorithm seamlessly degenerates into a standard merge sort!
 		const long cache_size = 512;
-		__typeof__(array[0]) cache[cache_size];
+		value_type cache[cache_size];
 		
 		// calculate how to scale the index value to the range within the array
 		// (this is essentially fixed-point math, where we manually check for and handle overflow)
 		const long power_of_two = FloorPowerOfTwo(size);
-		const long fractional_base = power_of_two/16;
+		const long fractional_base = power_of_two / 16;
 		long fractional_step = size % fractional_base;
-		long decimal_step = size/fractional_base;
+		long decimal_step = size / fractional_base;
 		
 		// first insertion sort everything the lowest level, which is 16-31 items at a time
 		long start, mid, end, decimal = 0, fractional = 0;
@@ -226,7 +231,7 @@ namespace Wiki {
 			
 			InsertionSort(array + start, array + end, compare);
 		}
-		
+
 		// then merge sort the higher levels, which can be 32-63, 64-127, 128-255, etc.
 		for (long merge_size = 16; merge_size < power_of_two; merge_size += merge_size) {
 			long block_size = sqrt(decimal_step);
@@ -234,7 +239,8 @@ namespace Wiki {
 			
 			// as an optimization, we really only need to pull out an internal buffer once for each level of merges
 			// after that we can reuse the same buffer over and over, then redistribute it when we're finished with this level
-			Range level1 = Range(0, 0), level2, levelA, levelB;
+			Range level1 = Range(0, 0), level2;
+			RangeT levelA, levelB;
 			
 			decimal = fractional = 0;
 			while (decimal < size) {
@@ -267,7 +273,7 @@ namespace Wiki {
 					Range A = Range(start, mid), B = Range(mid, end);
 					
 					if (A.length() <= cache_size) {
-						std::copy(&array[A.start], &array[A.end], &cache[0]);
+						std::copy(&array[A.start], &array[A.end], cache);
 						Merge(array, Range(0, 0), A, B, compare, cache, cache_size);
 						continue;
 					}
@@ -423,8 +429,8 @@ namespace Wiki {
 						// reuse these buffers next time!
 						level1 = buffer1;
 						level2 = buffer2;
-						levelA = bufferA;
-						levelB = bufferB;
+						levelA = RangeT(first, bufferA);
+						levelB = RangeT(first, bufferB);
 					}
 					
 					// break the remainder of A into blocks. firstA is the uneven-sized first A block
@@ -443,10 +449,10 @@ namespace Wiki {
 					blockA.start += firstA.length();
 					
 					long minA = blockA.start, indexA = 0;
-					__typeof__(*array) min_value = array[minA];
+					value_type min_value = array[minA];
 					
 					if (lastA.length() <= cache_size)
-						std::copy(&array[lastA.start], &array[lastA.end], &cache[0]);
+						std::copy(&array[lastA.start], &array[lastA.end], cache);
 					else
 						BlockSwap(array + lastA.start, array + buffer2.start, lastA.length());
 					
@@ -531,24 +537,24 @@ namespace Wiki {
 				InsertionSort(array + level2.start, array + level2.end, compare);
 				
 				// redistribute bufferA back into the array
-				long level_start = levelA.start;
-				for (long index = levelA.end; levelA.length() > 0; index++) {
-					if (index == levelB.start || !compare(array[index], array[levelA.start])) {
-						long amount = index - (levelA.end);
-						Rotate(array + levelA.start, array + index, -amount, cache, cache_size);
-						levelA.start += (amount + 1);
+				Iterator level_start = levelA.start;
+				for (Iterator index = levelA.end; levelA.length() > 0; index++) {
+					if (index == levelB.start || !compare(*index, *levelA.start)) {
+						long amount = index - levelA.end;
+						Rotate(levelA.start, index, -amount, cache, cache_size);
+						levelA.start += amount + 1;
 						levelA.end += amount;
 						index--;
 					}
 				}
 				
 				// redistribute bufferB back into the array
-				for (long index = levelB.start; levelB.length() > 0; index--) {
-					if (index == level_start || !compare(array[levelB.end - 1], array[index - 1])) {
+				for (Iterator index = levelB.start; levelB.length() > 0; index--) {
+					if (index == level_start || !compare(*(levelB.end - 1), *(index - 1))) {
 						long amount = levelB.start - index;
-						Rotate(array + index, array + levelB.end, amount, cache, cache_size);
+						Rotate(index, levelB.end, amount, cache, cache_size);
 						levelB.start -= amount;
-						levelB.end -= (amount + 1);
+						levelB.end -= amount + 1;
 						index++;
 					}
 				}
