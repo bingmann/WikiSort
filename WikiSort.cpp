@@ -68,35 +68,35 @@ void BlockSwap(Iterator start1, Iterator start2, const long block_size) {
 }
 
 // rotate the values in an array ([0 1 2 3] becomes [1 2 3 0] if we rotate by 1)
-template <typename T>
-void Rotate(T array[], const long amount, const Range range, T cache[], const long cache_size) {
-	if (range.length() == 0) return;
+template <typename Iterator>
+void Rotate(Iterator begin, Iterator end, const long amount, Iterator cache, const long cache_size) {
+	if (begin >= end) return;
 	
-	long split;
-	if (amount >= 0) split = range.start + amount;
-	else split = range.end + amount;
-	
-	Range range1 = Range(range.start, split);
-	Range range2 = Range(split, range.end);
+	Iterator split;
+	if (amount >= 0) split = begin + amount;
+	else split = end + amount;
+
+	size_t r1 = split - begin;
+	size_t r2 = end - split;
 	
 	// if the smaller of the two ranges fits into the cache, it's *slightly* faster copying it there and shifting the elements over
-	if (range1.length() <= range2.length()) {
-		if (range1.length() <= cache_size) {
-			std::memcpy(&cache[0], &array[range1.start], range1.length() * sizeof(array[0]));
-			std::memmove(&array[range1.start], &array[range2.start], range2.length() * sizeof(array[0]));
-			std::memcpy(&array[range1.start + range2.length()], &cache[0], range1.length() * sizeof(array[0]));
+	if (r1 <= r2) {
+		if (r1 <= cache_size) {
+			std::copy(begin, split, cache);
+			std::copy_backward(split, end, begin + r2);
+			std::copy(cache, cache + r1, begin + r2);
 			return;
 		}
 	} else {
-		if (range2.length() <= cache_size) {
-			std::memcpy(&cache[0], &array[range2.start], range2.length() * sizeof(array[0]));
-			std::memmove(&array[range2.end - range1.length()], &array[range1.start], range1.length() * sizeof(array[0]));
-			std::memcpy(&array[range1.start], &cache[0], range2.length() * sizeof(array[0]));
+		if (r2 <= cache_size) {
+			std::copy(split, end, cache);
+			std::copy_backward(begin, split, end);
+			std::copy(cache, cache + r2, begin);
 			return;
 		}
 	}
-	
-	std::rotate(&array[range1.start], &array[range2.start], &array[range2.end]);
+
+	std::rotate(begin, split, end);
 }
 
 namespace Wiki {
@@ -236,7 +236,7 @@ namespace Wiki {
 				
 				if (compare(array[end - 1], array[start])) {
 					// the two ranges are in reverse order, so a simple rotation should fix it
-					Rotate(array, mid - start, Range(start, end), cache, cache_size);
+					Rotate(array + start, array + end, mid - start, cache, cache_size);
 					
 				} else if (compare(array[mid], array[mid - 1])) {
 					// these two ranges weren't already in order, so we'll need to merge them!
@@ -366,7 +366,7 @@ namespace Wiki {
 								
 								// rotate A into place
 								long amount = mid - A.end;
-								Rotate(array, -amount, Range(A.start, mid), cache, cache_size);
+								Rotate(array + A.start, array + mid, -amount, cache, cache_size);
 								
 								// calculate the new A and B ranges
 								B.start = mid;
@@ -380,7 +380,7 @@ namespace Wiki {
 						long length = bufferA.length(); count = 0;
 						for (long index = bufferA.start; count < length; index--) {
 							if (index == A.start || compare(array[index - 1], array[index]) || compare(array[index], array[index - 1])) {
-								Rotate(array, -count, Range(index + 1, bufferA.start + 1), cache, cache_size);
+								Rotate(array + index + 1, array + bufferA.start + 1, -count, cache, cache_size);
 								bufferA.start = index + count; count++;
 							}
 						}
@@ -390,7 +390,7 @@ namespace Wiki {
 						length = bufferB.length(); count = 0;
 						for (long index = bufferB.start; count < length; index++) {
 							if (index == B.end - 1 || compare(array[index], array[index + 1]) || compare(array[index + 1], array[index])) {
-								Rotate(array, count, Range(bufferB.start, index), cache, cache_size);
+								Rotate(array + bufferB.start, array + index, count, cache, cache_size);
 								bufferB.start = index - count; count++;
 							}
 						}
@@ -473,7 +473,7 @@ namespace Wiki {
 						} else if (blockB.length() < block_size) {
 							// move the last B block, which is unevenly sized, to before the remaining A blocks, by using a rotation
 							// (using the cache is disabled since we have the contents of the previous A block in it!)
-							Rotate(array, -blockB.length(), Range(blockA.start, blockB.end), cache, 0);
+							Rotate(array + blockA.start, array + blockB.end, -blockB.length(), cache, 0);
 							lastB = Range(blockA.start, blockA.start + blockB.length());
 							blockA.start += blockB.length();
 							blockA.end += blockB.length();
@@ -511,7 +511,7 @@ namespace Wiki {
 				for (long index = levelA.end; levelA.length() > 0; index++) {
 					if (index == levelB.start || !compare(array[index], array[levelA.start])) {
 						long amount = index - (levelA.end);
-						Rotate(array, -amount, Range(levelA.start, index), cache, cache_size);
+						Rotate(array + levelA.start, array + index, -amount, cache, cache_size);
 						levelA.start += (amount + 1);
 						levelA.end += amount;
 						index--;
@@ -522,7 +522,7 @@ namespace Wiki {
 				for (long index = levelB.start; levelB.length() > 0; index--) {
 					if (index == level_start || !compare(array[levelB.end - 1], array[index - 1])) {
 						long amount = levelB.start - index;
-						Rotate(array, amount, Range(index, levelB.end), cache, cache_size);
+						Rotate(array + index, array + levelB.end, amount, cache, cache_size);
 						levelB.start -= amount;
 						levelB.end -= (amount + 1);
 						index++;
