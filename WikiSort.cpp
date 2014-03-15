@@ -27,15 +27,15 @@ public:
 	
 	RangeI() {}
 	RangeI(iterator start, iterator end) : start(start), end(end) {}
-	inline long length() const { return end - start; }
+	inline ssize_t length() const { return end - start; }
 };
 
 // toolbox functions used by the sorter
 
 // 63 -> 32, 64 -> 64, etc.
 // apparently this comes from Hacker's Delight?
-long FloorPowerOfTwo (const long value) {
-	long x = value;
+size_t FloorPowerOfTwo (const size_t value) {
+	size_t x = value;
 	x = x | (x >> 1);
 	x = x | (x >> 2);
 	x = x | (x >> 4);
@@ -55,14 +55,14 @@ void InsertionSort(Iterator begin, Iterator end, const Comparison compare) {
 
 // swap a series of values in the array
 template <typename Iterator>
-void BlockSwap(Iterator start1, Iterator start2, const long block_size) {
+void BlockSwap(Iterator start1, Iterator start2, const size_t block_size) {
 	std::swap_ranges(start1, start1 + block_size, start2);
 }
 
 // rotate the values in an array ([0 1 2 3] becomes [1 2 3 0] if we rotate by 1)
 template <typename Iterator>
-void Rotate(Iterator begin, Iterator end, const long amount,
-	    typename std::iterator_traits<Iterator>::value_type* cache, const long cache_size)
+void Rotate(Iterator begin, Iterator end, const ssize_t amount,
+	    typename std::iterator_traits<Iterator>::value_type* cache, const size_t cache_size)
 {
 	if (begin >= end) return;
 	
@@ -97,7 +97,7 @@ namespace Wiki {
 	// standard merge operation using an internal or external buffer
 	template <typename Iterator, typename Comparison>
 	void Merge(const RangeI<Iterator>& buffer, const RangeI<Iterator>& A, const RangeI<Iterator>& B,
-		   const Comparison compare, typename std::iterator_traits<Iterator>::value_type* cache, const long cache_size)
+		   const Comparison compare, typename std::iterator_traits<Iterator>::value_type* cache, const size_t cache_size)
 	{
 		typedef typename std::iterator_traits<Iterator>::value_type value_type;
 
@@ -157,7 +157,7 @@ namespace Wiki {
 	void Sort(Iterator first, Iterator last, const Comparison compare) {
 		// map first and last to a C-style array, so we don't have to change the rest of the code
 		// (bit of a nasty hack, but it's good enough for now...)
-		const long size = last - first;
+		const size_t size = last - first;
 
 		typedef typename std::iterator_traits<Iterator>::value_type value_type;
 		typedef RangeI<Iterator> Range;
@@ -176,19 +176,19 @@ namespace Wiki {
 		
 		// also, if you change this to dynamically allocate a full-size buffer,
 		// the algorithm seamlessly degenerates into a standard merge sort!
-		const long cache_size = 512;
+		const size_t cache_size = 512;
 		value_type cache[cache_size];
 		
 		// calculate how to scale the index value to the range within the array
 		// (this is essentially fixed-point math, where we manually check for and handle overflow)
-		const long power_of_two = FloorPowerOfTwo(size);
-		const long fractional_base = power_of_two / 16;
-		long fractional_step = size % fractional_base;
-		long decimal_step = size / fractional_base;
+		const size_t power_of_two = FloorPowerOfTwo(size);
+		const size_t fractional_base = power_of_two / 16;
+		size_t fractional_step = size % fractional_base;
+		size_t decimal_step = size / fractional_base;
 		
 		// first insertion sort everything the lowest level, which is 16-31 items at a time
 		Iterator start = first, mid, end = first;
-		long fractional = 0;
+		size_t fractional = 0;
 		while (end < last) {
 			
 			end += decimal_step;
@@ -205,15 +205,15 @@ namespace Wiki {
 		}
 
 		// then merge sort the higher levels, which can be 32-63, 64-127, 128-255, etc.
-		for (long merge_size = 16; merge_size < power_of_two; merge_size += merge_size) {
-			long block_size = sqrt(decimal_step);
-			long buffer_size = decimal_step/block_size + 1;
+		for (size_t merge_size = 16; merge_size < power_of_two; merge_size += merge_size) {
+			size_t block_size = sqrt(decimal_step);
+			size_t buffer_size = decimal_step / block_size + 1;
 			
 			// as an optimization, we really only need to pull out an internal buffer once for each level of merges
 			// after that we can reuse the same buffer over and over, then redistribute it when we're finished with this level
 			Range level1 = Range(first, first), level2, levelA, levelB;
 			
-			long decimal = fractional = 0;
+			size_t decimal = fractional = 0;
 			while (decimal < size) {
 				start = first + decimal;
 				
@@ -261,7 +261,7 @@ namespace Wiki {
 						
 					} else {
 						// the first item is always going to be the first unique value, so let's start searching at the next index
-						long count = 1;
+						size_t count = 1;
 						for (buffer1.start = A.start + 1; buffer1.start < A.end; buffer1.start++)
 							if (compare(*(buffer1.start - 1), *buffer1.start) || compare(*buffer1.start, *(buffer1.start - 1)))
 								if (++count == buffer_size)
@@ -366,7 +366,7 @@ namespace Wiki {
 								Iterator mid = std::lower_bound(B.start, B.end, *A.start, compare);
 								
 								// rotate A into place
-								long amount = mid - A.end;
+								ssize_t amount = mid - A.end;
 								Rotate(A.start, mid, -amount, cache, cache_size);
 								
 								// calculate the new A and B ranges
@@ -378,7 +378,7 @@ namespace Wiki {
 						}
 						
 						// move the unique values to the start of A if needed
-						long length = bufferA.length(); count = 0;
+						size_t length = bufferA.length(); count = 0;
 						for (Iterator index = bufferA.start; count < length; index--) {
 							if (index == A.start || compare(*(index - 1), *index) || compare(*index, *(index - 1))) {
 								Rotate(index + 1, bufferA.start + 1, -count, cache, cache_size);
@@ -416,7 +416,7 @@ namespace Wiki {
 					// whenever we leave an A block behind, we'll need to merge the previous A block with any B blocks that follow it, so track that information as well
 					Range lastA = firstA;
 					Range lastB = Range(first, first);
-					Range blockB = Range(B.start, B.start + std::min(block_size, B.length() - bufferB.length()));
+					Range blockB = Range(B.start, B.start + std::min<size_t>(block_size, B.length() - bufferB.length()));
 					blockA.start += firstA.length();
 					
 					Iterator minA = blockA.start, indexA = buffer1.start;
@@ -433,7 +433,7 @@ namespace Wiki {
 						if ((lastB.length() > 0 && !compare(*(lastB.end - 1), min_value)) || blockB.length() == 0) {
 							// figure out where to split the previous B block, and rotate it at the split
 							Iterator B_split = std::lower_bound(lastB.start, lastB.end, min_value, compare);
-							long B_remaining = lastB.end - B_split;
+							size_t B_remaining = lastB.end - B_split;
 							
 							// swap the minimum A block to the beginning of the rolling A blocks
 							BlockSwap(blockA.start, minA, block_size);
@@ -511,7 +511,7 @@ namespace Wiki {
 				Iterator level_start = levelA.start;
 				for (Iterator index = levelA.end; levelA.length() > 0; index++) {
 					if (index == levelB.start || !compare(*index, *levelA.start)) {
-						long amount = index - levelA.end;
+						ssize_t amount = index - levelA.end;
 						Rotate(levelA.start, index, -amount, cache, cache_size);
 						levelA.start += amount + 1;
 						levelA.end += amount;
@@ -522,7 +522,7 @@ namespace Wiki {
 				// redistribute bufferB back into the array
 				for (Iterator index = levelB.start; levelB.length() > 0; index--) {
 					if (index == level_start || !compare(*(levelB.end - 1), *(index - 1))) {
-						long amount = levelB.start - index;
+						ssize_t amount = levelB.start - index;
 						Rotate(index, levelB.end, amount, cache, cache_size);
 						levelB.start -= amount;
 						levelB.end -= amount + 1;
