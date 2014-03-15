@@ -44,33 +44,27 @@ long FloorPowerOfTwo (const long value) {
 }
 
 // find the index of the first value within the range that is equal to array[index]
-template <typename T, typename Comparison>
-long BinaryFirst(const T array[], const T &value, const Range range, const Comparison compare) {
-	return std::lower_bound(&array[range.start], &array[range.end], value, compare) - &array[0];
+template <typename Iterator, typename Comparison>
+long BinaryFirst(Iterator begin, Iterator end, const typename std::iterator_traits<Iterator>::value_type& value, const Comparison compare) {
+	return std::lower_bound(begin, end, value, compare) - begin;
 }
 
 // find the index of the last value within the range that is equal to array[index], plus 1
-template <typename T, typename Comparison>
-long BinaryLast(const T array[], const T &value, const Range range, const Comparison compare) {
-	return std::upper_bound(&array[range.start], &array[range.end], value, compare) - &array[0];
+template <typename Iterator, typename Comparison>
+long BinaryLast(Iterator begin, Iterator end, const typename std::iterator_traits<Iterator>::value_type& value, const Comparison compare) {
+	return std::upper_bound(begin, end, value, compare) - begin;
 }
 
 // n^2 sorting algorithm used to sort tiny chunks of the full array
-template <typename T, typename Comparison>
-void InsertionSort(T array[], const Range range, const Comparison compare) {
-	std::__insertion_sort(&array[range.start], &array[range.end], compare);
-}
-
-// reverse a range within the array
-template <typename T>
-void Reverse(T array[], const Range range) {
-	std::reverse(&array[range.start], &array[range.end]);
+template <typename Iterator, typename Comparison>
+void InsertionSort(Iterator begin, Iterator end, const Comparison compare) {
+	std::__insertion_sort(begin, end, compare);
 }
 
 // swap a series of values in the array
-template <typename T>
-void BlockSwap(T array[], const long start1, const long start2, const long block_size) {
-	std::swap_ranges(&array[start1], &array[start1 + block_size], &array[start2]);
+template <typename Iterator>
+void BlockSwap(Iterator start1, Iterator start2, const long block_size) {
+	std::swap_ranges(start1, start1 + block_size, start2);
 }
 
 // rotate the values in an array ([0 1 2 3] becomes [1 2 3 0] if we rotate by 1)
@@ -170,7 +164,7 @@ namespace Wiki {
 		
 		// if there are 32 or fewer items, just insertion sort the entire array
 		if (size <= 32) {
-			InsertionSort(array, Range(0, size), compare);
+			InsertionSort(array, array + size, compare);
 			return;
 		}
 		
@@ -206,7 +200,7 @@ namespace Wiki {
 			
 			end = decimal;
 			
-			InsertionSort(array, Range(start, end), compare);
+			InsertionSort(array + start, array + end, compare);
 		}
 		
 		// then merge sort the higher levels, which can be 32-63, 64-127, 128-255, etc.
@@ -368,7 +362,7 @@ namespace Wiki {
 							// we can use this knowledge to write a merge operation that is optimized for arrays of repeating values
 							while (A.length() > 0 && B.length() > 0) {
 								// find the first place in B where the first item in A needs to be inserted
-								long mid = BinaryFirst(array, array[A.start], B, compare);
+								long mid = BinaryFirst(array + B.start, array + B.end, array[A.start], compare) + B.start;
 								
 								// rotate A into place
 								long amount = mid - A.end;
@@ -376,7 +370,7 @@ namespace Wiki {
 								
 								// calculate the new A and B ranges
 								B.start = mid;
-								A = Range(BinaryLast(array, array[A.start + amount], A, compare), B.start);
+								A = Range(BinaryLast(array + A.start, array + A.end, array[A.start + amount], compare) + A.start, B.start);
 							}
 							
 							continue;
@@ -430,18 +424,18 @@ namespace Wiki {
 					if (lastA.length() <= cache_size)
 						std::copy(&array[lastA.start], &array[lastA.end], &cache[0]);
 					else
-						BlockSwap(array, lastA.start, buffer2.start, lastA.length());
+						BlockSwap(array + lastA.start, array + buffer2.start, lastA.length());
 					
 					while (true) {
 						// if there's a previous B block and the first value of the minimum A block is <= the last value of the previous B block,
 						// then drop that minimum A block behind. or if there are no B blocks left then keep dropping the remaining A blocks.
 						if ((lastB.length() > 0 && !compare(array[lastB.end - 1], min_value)) || blockB.length() == 0) {
 							// figure out where to split the previous B block, and rotate it at the split
-							long B_split = BinaryFirst(array, min_value, lastB, compare);
+							long B_split = BinaryFirst(array + lastB.start, array + lastB.end, min_value, compare) + lastB.start;
 							long B_remaining = lastB.end - B_split;
 							
 							// swap the minimum A block to the beginning of the rolling A blocks
-							BlockSwap(array, blockA.start, minA, block_size);
+							BlockSwap(array + blockA.start, array + minA, block_size);
 							
 							// we need to swap the second item of the previous A block back with its original value, which is stored in buffer1
 							// since the firstA block did not have its value swapped out, we need to make sure the previous A block is not unevenly sized
@@ -454,12 +448,12 @@ namespace Wiki {
 							if (block_size <= cache_size)
 								std::copy(&array[blockA.start], &array[blockA.start + block_size], cache);
 							else
-								BlockSwap(array, blockA.start, buffer2.start, block_size);
+								BlockSwap(array + blockA.start, array + buffer2.start, block_size);
 							
 							// this is equivalent to rotating, but faster
 							// the area normally taken up by the A block is either the contents of buffer2, or data we don't need anymore since we memcopied it
 							// either way, we don't need to retain the order of those items, so instead of rotating we can just block swap B to where it belongs
-							BlockSwap(array, B_split, blockA.start + block_size - B_remaining, B_remaining);
+							BlockSwap(array + B_split, array + blockA.start + block_size - B_remaining, B_remaining);
 							
 							// now we need to update the ranges and stuff
 							lastA = Range(blockA.start - B_remaining, blockA.start - B_remaining + block_size);
@@ -487,7 +481,7 @@ namespace Wiki {
 							blockB.end = blockB.start;
 						} else {
 							// roll the leftmost A block to the end by swapping it with the next B block
-							BlockSwap(array, blockA.start, blockB.start, block_size);
+							BlockSwap(array + blockA.start, array + blockB.start, block_size);
 							lastB = Range(blockA.start, blockA.start + block_size);
 							if (minA == blockA.start)
 								minA = blockA.end;
@@ -510,7 +504,7 @@ namespace Wiki {
 			if (level1.length() > 0) {
 				// when we're finished with this step we should have b1 b2 left over, where one of the buffers is all jumbled up
 				// insertion sort the jumbled up buffer, then redistribute them back into the array using the opposite process used for creating the buffer
-				InsertionSort(array, level2, compare);
+				InsertionSort(array + level2.start, array + level2.end, compare);
 				
 				// redistribute bufferA back into the array
 				long level_start = levelA.start;
