@@ -26,6 +26,22 @@ public:
 	inline long length() const { return end - start; }
 };
 
+// structure to represent ranges within the array
+template <typename IteratorType>
+class RangeI {
+public:
+	typedef IteratorType iterator;
+	typedef typename std::iterator_traits<iterator>::value_type value_type;
+
+	iterator start;
+	iterator end;
+	
+	RangeI() {}
+	RangeI(iterator start, iterator end) : start(start), end(end) {}
+	RangeI(value_type* array, const Range& r) : start(array + r.start), end(array + r.end) {}
+	inline long length() const { return end - start; }
+};
+
 // toolbox functions used by the sorter
 
 // 63 -> 32, 64 -> 64, etc.
@@ -101,13 +117,14 @@ void Rotate(Iterator begin, Iterator end, const long amount, Iterator cache, con
 
 namespace Wiki {
 	// standard merge operation using an internal or external buffer
-	template <typename T, typename Comparison>
-	void Merge(T array[], const Range buffer, const Range A, const Range B, const Comparison compare, T cache[], const long cache_size) {
+	template <typename Iterator, typename Comparison>
+	void Merge(const RangeI<Iterator> buffer, const RangeI<Iterator> A, const RangeI<Iterator> B,
+		   const Comparison compare, Iterator cache, const long cache_size) {
 		// if A fits into the cache, use that instead of the internal buffer
 		if (A.length() <= cache_size) {
-			T *A_index = &cache[0], *B_index = &array[B.start];
-			T *A_last = &cache[A.length()], *B_last = &array[B.end];
-			T *insert_index = &array[A.start];
+			Iterator A_index = cache, B_index = B.start;
+			Iterator A_last = cache + A.length(), B_last = B.end;
+			Iterator insert_index = A.start;
 			
 			if (B.length() > 0 && A.length() > 0) {
 				while (true) {
@@ -130,9 +147,9 @@ namespace Wiki {
 		} else {
 			// whenever we find a value to add to the final array, swap it with the value that's already in that spot
 			// when this algorithm is finished, 'buffer' will contain its original contents, but in a different order
-			T *A_index = &array[buffer.start], *B_index = &array[B.start];
-			T *A_last = &array[buffer.start + A.length()], *B_last = &array[B.end];
-			T *insert_index = &array[A.start];
+			Iterator A_index = buffer.start, B_index = B.start;
+			Iterator A_last = buffer.start + A.length(), B_last = B.end;
+			Iterator insert_index = A.start;
 			
 			if (B.length() > 0 && A.length() > 0) {
 				while (true) {
@@ -154,6 +171,13 @@ namespace Wiki {
 		}
 	}
 	
+	// standard merge operation using an internal or external buffer
+	template <typename T, typename Comparison>
+	void Merge(T array[], const Range buffer, const Range A, const Range B, const Comparison compare, T cache[], const long cache_size) {
+		typedef RangeI<T*> RangeT;
+		Merge(RangeT(array, buffer), RangeT(array, A), RangeT(array, B), compare, cache, cache_size);
+	}
+
 	// bottom-up merge sort combined with an in-place merge algorithm for O(1) memory use
 	template <typename Iterator, typename Comparison>
 	void Sort(Iterator first, Iterator last, const Comparison compare) {
