@@ -1,3 +1,4 @@
+// -*- mode: c++; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*-
 /***********************************************************
  to run:
  clang++ -o WikiSort.x WikiSort.cpp -O3
